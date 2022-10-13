@@ -3,7 +3,7 @@
 	"name": "Recently modified notes (dataview-based)",
 	"version": "0.1.0",
 	"minAppVersion": "0.15.0",
-	"description": "Display a list of recently recently modified notes (requires dataview plugin)",
+	"description": "Display a list of recently modified notes (requires dataview plugin)",
 	"author": "SebastianMC",
 	"authorUrl": "https://github.com/SebastianMC",
 	"isDesktopOnly": false
