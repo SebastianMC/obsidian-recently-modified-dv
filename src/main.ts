@@ -6,6 +6,7 @@ import {
   Notice,
   Plugin,
   PluginSettingTab,
+  Setting,
   WorkspaceLeaf,
   MetadataCacheWithDataview
 } from 'obsidian';
@@ -22,11 +23,21 @@ interface ModifiedNote {
 
 interface RecentlyModifiedNotes {
   recentlyModifiedNotes: ModifiedNote[] | undefined
+  isUpToDate: boolean
 }
 
 const DEFAULT_DATA: RecentlyModifiedNotes = {
-  recentlyModifiedNotes: []
+  recentlyModifiedNotes: [],
+  isUpToDate: false
 };
+
+interface RecentlyModifiedNotesPluginSettings {
+  autoRefreshEnabled: boolean
+}
+
+const DEFAULT_SETTINGS: RecentlyModifiedNotesPluginSettings = {
+  autoRefreshEnabled: true
+}
 
 const RecentlyModifiedListViewType = 'recently-modified-dv';
 
@@ -67,15 +78,7 @@ class RecentlyModifiedListView extends ItemView {
         item
           .setTitle('Refresh list')
           .onClick(async () => {
-            const list = this.plugin.dvApi
-                ?.pages('-#ignore-in-recent')
-                .sort((b => b.mtime), 'desc')
-                .limit(15)
-                .map(b => ({path: b.file.path, name: b.file.name} as ModifiedNote))
-                .array()
-            console.log(list)
-            this.plugin.data.recentlyModifiedNotes = list
-            await this.plugin.saveData();
+            this.plugin.refreshRecentlyModifiedListFromDv()
             this.redraw();
           });
       })
@@ -86,6 +89,17 @@ class RecentlyModifiedListView extends ItemView {
   }
 
   public readonly redraw = (): void => {
+    if (!this.plugin.data.isUpToDate) {
+      if (this.plugin.data.recentlyModifiedNotes?.length === 0 || this.plugin.settings.autoRefreshEnabled) {
+        console.log(`DV Recent redraw: no data ${this.plugin.data.recentlyModifiedNotes?.length} or not up to date -> REFRESHING from dv`)
+        this.plugin.refreshRecentlyModifiedListFromDv()
+      } else {
+        console.log(`DV Recent redraw: data not up to date (or empty), NOT refreshing`)
+      }
+    } else {
+      console.log(`DV Recent redraw: data are up to date`)
+    }
+
     const openFile = this.app.workspace.getActiveFile();
 
     const rootEl = createDiv({ cls: 'nav-folder mod-root' });
@@ -172,21 +186,23 @@ class RecentlyModifiedListView extends ItemView {
     } else {
       new Notice(`Cannot find file '${note.name}'`);
       this.data.recentlyModifiedNotes = this.data.recentlyModifiedNotes?.filter((note) => note.path !== note.path);
-      this.plugin.saveData();
       this.redraw();
     }
   };
 }
 
 export default class RecentlyModifiedNotesPlugin extends Plugin {
-  public data: RecentlyModifiedNotes;
-  public view: RecentlyModifiedListView;
+  public settings: RecentlyModifiedNotesPluginSettings
+  public data: RecentlyModifiedNotes
+  public view: RecentlyModifiedListView
   public dvApi: DataviewApi | undefined
 
   public async onload(): Promise<void> {
-    console.log(`Loading ${this.manifest.id}`);
+    console.log(`Loading ${this.manifest.id}`)
 
-    await this.loadData();
+    await this.loadSettings()
+
+    this.data = DEFAULT_DATA
 
     this.registerView(
       RecentlyModifiedListViewType,
@@ -224,9 +240,11 @@ export default class RecentlyModifiedNotesPlugin extends Plugin {
     if (this.dvApi && isDataviewPluginEnabled(this.app)) {
       const mCache: MetadataCacheWithDataview = (this.app.metadataCache as Events as MetadataCacheWithDataview)
       this.registerEvent(mCache.on("dataview:index-ready", () => {
+        this.data.isUpToDate = false
         console.log(`DV notified - index ready`)
       }))
       this.registerEvent(mCache.on("dataview:metadata-change", (type, file, oldPath?) => {
+        this.data.isUpToDate = false
         console.log(`DV notified - metadata-change - is it triggered for deletion or for plain edit as well???"`)
       }));
     } else {
@@ -248,12 +266,26 @@ export default class RecentlyModifiedNotesPlugin extends Plugin {
     );
   }
 
-  public async loadData(): Promise<void> {
-    this.data = Object.assign(DEFAULT_DATA, await super.loadData());
+  async loadSettings() {
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
   }
 
-  public async saveData(): Promise<void> {
-    await super.saveData(this.data);
+  async saveSettings() {
+    await this.saveData(this.settings);
+  }
+
+  refreshRecentlyModifiedListFromDv() {
+    if (this.dvApi && isDataviewPluginEnabled(this.app)) {
+      const list = this.dvApi
+          ?.pages('-#ignore-in-recent')
+          .sort((b => b.file.mtime), 'desc')
+          .limit(30)
+          .map(b => ({path: b.file.path, name: b.file.name} as ModifiedNote))
+          .array()
+      console.log(list)
+      this.data.recentlyModifiedNotes = list
+      this.data.isUpToDate = true
+    }
   }
 
   private readonly initView = async (): Promise<void> => {
@@ -285,5 +317,19 @@ class RecentlyModifiedNotesSettingTab extends PluginSettingTab {
     const {containerEl} = this;
     containerEl.empty();
     containerEl.createEl('h2', { text: 'Settings for Recently Modified Notes List plugin' });
+
+    new Setting(containerEl)
+        .setName('Enable auto refresh')
+        .setDesc('The list of recently modified notes will be refreshed automatically upon each note change.')
+        .addToggle(toggle => toggle
+            .setValue(this.plugin.settings.autoRefreshEnabled)
+            .onChange(async (value) => {
+              this.plugin.settings.autoRefreshEnabled = value;
+              if (value) {
+                this.plugin.refreshRecentlyModifiedListFromDv()
+                this.plugin.view?.redraw();
+              }
+              await this.plugin.saveSettings();
+            }));
   }
 }
