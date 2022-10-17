@@ -1,11 +1,11 @@
-import {App, Plugin_2, PluginSettingTab, Setting} from "obsidian";
+import {App, Plugin, PluginSettingTab, Setting} from "obsidian";
 import {RecentlyModifiedNotesPluginInterface} from "./common";
 
 export class RecentlyModifiedNotesSettingTab extends PluginSettingTab {
     private readonly plugin: RecentlyModifiedNotesPluginInterface;
 
     constructor(app: App, plugin: RecentlyModifiedNotesPluginInterface) {
-        super(app, plugin as unknown as Plugin_2);  // To avoid circular dependency on the actual plugin type
+        super(app, plugin as unknown as Plugin);  // To avoid circular dependency on the actual plugin type
         this.plugin = plugin;
     }
 

@@ -1,5 +1,3 @@
-import {Plugin} from "obsidian";
-
 export interface ModifiedNote {
     path: string;
     name: string;
