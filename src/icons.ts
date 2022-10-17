@@ -4,11 +4,14 @@ export const ICON_CLOCK_AND_PEN: string = 'recently-modidied-notes-icon'
 
 export function addIcons() {
     addIcon(ICON_CLOCK_AND_PEN,
-    `<circle cx="50" cy="50" r="43.8000713858342" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="9"/>
-        <path d="M 50 50 L 50.703125 50 L 41.772727 22.636364" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="9"/>
-        <path d="M 62.10939 35.6 L 67.82793 42.549697 L 62.50919 46.926206 L 56.79065 39.97651 Z" fill="currentColor"/>
-        <path d="M 54.42812 41.9229 L 60.14666 48.872596 L 37.250434 67.7127 L 31.531892 60.76301 Z" fill="currentColor"/>
-        <path d="M 29.16945 62.7095 L 24.2617 72.57542 L 34.88799 69.6592 Z" fill="currentColor"/>`
+    `<path d="M 28.765338 88.30834 
+         C 7.608224 76.58076 -.03592441 49.92245 11.691656 28.7653384
+         C 23.419236 7.608224 50.07755 -.03592441 71.23466 11.691656
+         C 77.28012 15.042706 82.44665 19.776963 86.31185 25.50735" fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round" />
+    <path d="M 27.517986 72.1223 L 50.112867 49.887133 L 45.503597 29.67626" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="9" fill="none"/>
+    <path d="M 87.76221 40.087604 L 98.31476 50.747986 L 91.1663 57.82414 L 80.61375 47.163755 Z" fill="currentColor"/>
+    <path d="M 77.01511 50.55255 L 87.56766 61.21293 L 63.936375 84.60518 L 53.38383 73.94479 Z" fill="currentColor"/>
+    <path d="M 49.81125 77.65467 L 40.119633 97.71463 L 60.27708 88.22745 Z" fill="currentColor"/>`
     )
 }
 
