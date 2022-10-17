@@ -1,12 +1,7 @@
 import {
   App,
   Events,
-  ItemView,
-  Menu,
-  Notice,
   Plugin,
-  PluginSettingTab,
-  Setting,
   WorkspaceLeaf,
   MetadataCacheWithDataview
 } from 'obsidian';
@@ -15,192 +10,42 @@ import {
   getAPI as getDataviewAPI,
   isPluginEnabled as isDataviewPluginEnabled,
 } from "obsidian-dataview"
+import {
+  RecentlyModifiedNotes,
+  RecentlyModifiedNotesPluginSettings,
+  RecentlyModifiedNotesPluginInterface, ModifiedNote
+} from "./common";
+import {
+  RecentlyModifiedListView,
+  RecentlyModifiedListViewType
+} from "./recently-modified-view";
+import {addIcons} from "./icons";
+import {
+  RecentlyModifiedNotesSettingTab
+} from "./recently-modified-settings"
 
-interface ModifiedNote {
-  path: string;
-  name: string;
-}
-
-interface RecentlyModifiedNotes {
-  recentlyModifiedNotes: ModifiedNote[] | undefined
-  isUpToDate: boolean
-}
-
-const DEFAULT_DATA: RecentlyModifiedNotes = {
+export const DEFAULT_DATA: RecentlyModifiedNotes = {
   recentlyModifiedNotes: [],
   isUpToDate: false
 };
 
-interface RecentlyModifiedNotesPluginSettings {
-  autoRefreshEnabled: boolean
-}
-
-const DEFAULT_SETTINGS: RecentlyModifiedNotesPluginSettings = {
+export const DEFAULT_SETTINGS: RecentlyModifiedNotesPluginSettings = {
   autoRefreshEnabled: true
 }
 
-const RecentlyModifiedListViewType = 'recently-modified-dv';
-
-class RecentlyModifiedListView extends ItemView {
-  private readonly plugin: RecentlyModifiedNotesPlugin;
-  private data: RecentlyModifiedNotes;
-
-  constructor(
-    leaf: WorkspaceLeaf,
-    plugin: RecentlyModifiedNotesPlugin,
-    data: RecentlyModifiedNotes,
-  ) {
-    super(leaf);
-
-    this.plugin = plugin;
-    this.data = data;
-  }
-
-  public async onOpen(): Promise<void> {
-    this.redraw();
-  }
-
-  public getViewType(): string {
-    return RecentlyModifiedListViewType;
-  }
-
-  public getDisplayText(): string {
-    return 'Recently modified notes. Click to refresh';
-  }
-
-  public getIcon(): string {
-    return 'dice';
-  }
-
-  public onHeaderMenu(menu: Menu): void {
-    menu
-      .addItem((item) => {
-        item
-          .setTitle('Refresh list')
-          .onClick(async () => {
-            this.plugin.refreshRecentlyModifiedListFromDv()
-            this.redraw();
-          });
-      })
-  }
-
-  public load(): void {
-    super.load()
-  }
-
-  public readonly redraw = (): void => {
-    if (!this.plugin.data.isUpToDate) {
-      if (this.plugin.data.recentlyModifiedNotes?.length === 0 || this.plugin.settings.autoRefreshEnabled) {
-        console.log(`DV Recent redraw: no data ${this.plugin.data.recentlyModifiedNotes?.length} or not up to date -> REFRESHING from dv`)
-        this.plugin.refreshRecentlyModifiedListFromDv()
-      } else {
-        console.log(`DV Recent redraw: data not up to date (or empty), NOT refreshing`)
-      }
-    } else {
-      console.log(`DV Recent redraw: data are up to date`)
-    }
-
-    const openFile = this.app.workspace.getActiveFile();
-
-    const rootEl = createDiv({ cls: 'nav-folder mod-root' });
-    const childrenEl = rootEl.createDiv({ cls: 'nav-folder-children' });
-
-    this.data.recentlyModifiedNotes?.forEach((currentFile) => {
-      const navFile = childrenEl.createDiv({ cls: 'nav-file' });
-      const navFileTitle = navFile.createDiv({ cls: 'nav-file-title' });
-
-      if (openFile && currentFile.path === openFile.path) {
-        navFileTitle.addClass('is-active');
-      }
-
-      navFileTitle.createDiv({
-        cls: 'nav-file-title-content',
-        text: currentFile.name,
-      });
-
-      navFile.setAttr('draggable', 'true');
-      navFile.addEventListener('dragstart', (event: DragEvent) => {
-        const file = this.app.metadataCache.getFirstLinkpathDest(
-          currentFile.path,
-          '',
-        );
-
-        const dragManager = (this.app as any).dragManager;
-        const dragData = dragManager.dragFile(event, file);
-        dragManager.onDragStart(event, dragData);
-      });
-
-      navFile.addEventListener('mouseover', (event: MouseEvent) => {
-        this.app.workspace.trigger('hover-link', {
-          event,
-          source: RecentlyModifiedListViewType,
-          hoverParent: rootEl,
-          targetEl: navFile,
-          linktext: currentFile.path,
-        });
-      });
-
-      navFile.addEventListener('contextmenu', (event: MouseEvent) => {
-        const menu = new Menu();
-        const file = this.app.vault.getAbstractFileByPath(currentFile.path);
-        this.app.workspace.trigger(
-          'file-menu',
-          menu,
-          file,
-          'link-context-menu',
-        );
-        menu.showAtPosition({ x: event.clientX, y: event.clientY });
-      });
-
-      navFile.addEventListener('click', (event: MouseEvent) => {
-        this.openOrFocusFile(currentFile, event.ctrlKey || event.metaKey);
-      });
-    });
-
-    const contentEl = this.containerEl.children[1];
-    contentEl.empty();
-    contentEl.appendChild(rootEl);
-  };
-
-  /**
-   * Open the provided file in the most recent leaf.
-   *
-   * @param shouldSplit Whether the file should be opened in a new split, or in
-   * the most recent split. If the most recent split is pinned, this is set to
-   * true.
-   */
-  private readonly openOrFocusFile = (note: ModifiedNote, shouldSplit = false): void => {
-    // TODO: open file by name instead of calling the heavy .getFiles()
-    const targetFile = this.app.vault
-      .getFiles()
-      .find((f) => f.path === note.path);
-
-    if (targetFile) {
-      let leaf: WorkspaceLeaf | null = this.app.workspace.getMostRecentLeaf();
-
-      const createLeaf = shouldSplit || leaf?.getViewState().pinned;
-      if (createLeaf && leaf) {
-        leaf = this.app.workspace.createLeafBySplit(leaf);
-      }
-      leaf?.openFile(targetFile);
-    } else {
-      new Notice(`Cannot find file '${note.name}'`);
-      this.data.recentlyModifiedNotes = this.data.recentlyModifiedNotes?.filter((note) => note.path !== note.path);
-      this.redraw();
-    }
-  };
-}
-
-export default class RecentlyModifiedNotesPlugin extends Plugin {
+export default class RecentlyModifiedNotesPlugin extends Plugin implements RecentlyModifiedNotesPluginInterface {
   public settings: RecentlyModifiedNotesPluginSettings
   public data: RecentlyModifiedNotes
   public view: RecentlyModifiedListView
   public dvApi: DataviewApi | undefined
+  public dvIndexReady: boolean
 
   public async onload(): Promise<void> {
     console.log(`Loading ${this.manifest.id}`)
 
     await this.loadSettings()
+
+    addIcons()
 
     this.data = DEFAULT_DATA
 
@@ -245,7 +90,7 @@ export default class RecentlyModifiedNotesPlugin extends Plugin {
       }))
       this.registerEvent(mCache.on("dataview:metadata-change", (type, file, oldPath?) => {
         this.data.isUpToDate = false
-        console.log(`DV notified - metadata-change - is it triggered for deletion or for plain edit as well???"`)
+        console.log(`DV notified - metadata-change (also deletion, rename)`)
       }));
     } else {
       console.log(`DV is not installed or not enabled!`)
@@ -288,6 +133,10 @@ export default class RecentlyModifiedNotesPlugin extends Plugin {
     }
   }
 
+  redrawView(): void {
+    this.view?.redraw()
+  }
+
   private readonly initView = async (): Promise<void> => {
     let leaf: WorkspaceLeaf | null = null;
     for (leaf of this.app.workspace.getLeavesOfType(RecentlyModifiedListViewType)) {
@@ -305,31 +154,4 @@ export default class RecentlyModifiedNotesPlugin extends Plugin {
   };
 }
 
-class RecentlyModifiedNotesSettingTab extends PluginSettingTab {
-  private readonly plugin: RecentlyModifiedNotesPlugin;
 
-  constructor(app: App, plugin: RecentlyModifiedNotesPlugin) {
-    super(app, plugin);
-    this.plugin = plugin;
-  }
-
-  public display(): void {
-    const {containerEl} = this;
-    containerEl.empty();
-    containerEl.createEl('h2', { text: 'Settings for Recently Modified Notes List plugin' });
-
-    new Setting(containerEl)
-        .setName('Enable auto refresh')
-        .setDesc('The list of recently modified notes will be refreshed automatically upon each note change.')
-        .addToggle(toggle => toggle
-            .setValue(this.plugin.settings.autoRefreshEnabled)
-            .onChange(async (value) => {
-              this.plugin.settings.autoRefreshEnabled = value;
-              if (value) {
-                this.plugin.refreshRecentlyModifiedListFromDv()
-                this.plugin.view?.redraw();
-              }
-              await this.plugin.saveSettings();
-            }));
-  }
-}
