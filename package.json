@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-recently-modified-dv",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "Recently modified notes (dataview-based) - plugin for Obsidian (https://obsidian.md)",
 	"main": "main.js",
 	"scripts": {

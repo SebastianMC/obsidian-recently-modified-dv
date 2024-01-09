@@ -3,7 +3,7 @@ import {
   Events,
   Plugin,
   WorkspaceLeaf,
-  MetadataCacheWithDataview
+  MetadataCacheWithDataview, PluginManifest
 } from 'obsidian';
 import {
   DataviewApi,
@@ -35,10 +35,14 @@ export const DEFAULT_SETTINGS: RecentlyModifiedNotesPluginSettings = {
 
 export default class RecentlyModifiedNotesPlugin extends Plugin implements RecentlyModifiedNotesPluginInterface {
   public settings: RecentlyModifiedNotesPluginSettings
-  public data: RecentlyModifiedNotes
+
   public view: RecentlyModifiedListView
   public dvApi: DataviewApi | undefined
   public dvIndexReady: boolean
+
+  constructor(app: App, manifest: PluginManifest, public data: RecentlyModifiedNotes = DEFAULT_DATA) {
+    super(app, manifest);
+  }
 
   public async onload(): Promise<void> {
     console.log(`Loading ${this.manifest.id}`)
@@ -67,14 +71,6 @@ export default class RecentlyModifiedNotesPlugin extends Plugin implements Recen
         this.app.workspace.revealLeaf(leaf);
       }
     });
-
-    (this.app.workspace as any).registerHoverLinkSource(
-      RecentlyModifiedListViewType,
-      {
-        display: 'AAA Recently modified notes',
-        defaultMod: true,
-      },
-    );
 
     this.app.workspace.onLayoutReady(() => {
       this.initView()
@@ -106,9 +102,6 @@ export default class RecentlyModifiedNotesPlugin extends Plugin implements Recen
   }
 
   public onunload(): void {
-    (this.app.workspace as any).unregisterHoverLinkSource(
-      RecentlyModifiedListViewType,
-    );
   }
 
   async loadSettings() {
@@ -137,6 +130,18 @@ export default class RecentlyModifiedNotesPlugin extends Plugin implements Recen
     this.view?.redraw()
   }
 
+  isAutoDataRefreshEnabled(): boolean {
+    return this.settings.autoRefreshEnabled
+  }
+
+  getRecentlyModifiedNotesData(): RecentlyModifiedNotes {
+    return this.data
+  }
+
+  isDvAvailable(): boolean {
+    return (!!this.dvApi) && isDataviewPluginEnabled(this.app)
+  }
+
   private readonly initView = async (): Promise<void> => {
     let leaf: WorkspaceLeaf | null = null;
     for (leaf of this.app.workspace.getLeavesOfType(RecentlyModifiedListViewType)) {
@@ -149,7 +154,7 @@ export default class RecentlyModifiedNotesPlugin extends Plugin implements Recen
     }
     (leaf ?? this.app.workspace.getLeftLeaf(false)).setViewState({
       type: RecentlyModifiedListViewType,
-      active: true,
+      active: true
     });
   };
 }

@@ -1,17 +1,17 @@
 import {ItemView, Menu, Notice, WorkspaceLeaf, WorkspaceInternal, TFile} from "obsidian";
 import {ICON_CLOCK_AND_PEN} from "./icons";
-import RecentlyModifiedNotesPlugin from "./main";
+import {RecentlyModifiedNotesPluginInterface} from "./common";
 import {RecentlyModifiedNotes, ModifiedNote} from "./common";
 
 export const RecentlyModifiedListViewType = 'recently-modified-dv';
 
 export class RecentlyModifiedListView extends ItemView {
-    private readonly plugin: RecentlyModifiedNotesPlugin;
+    private readonly plugin: RecentlyModifiedNotesPluginInterface;
     private data: RecentlyModifiedNotes;
 
     constructor(
         leaf: WorkspaceLeaf,
-        plugin: RecentlyModifiedNotesPlugin,
+        plugin: RecentlyModifiedNotesPluginInterface,
         data: RecentlyModifiedNotes,
     ) {
         super(leaf);
@@ -53,9 +53,29 @@ export class RecentlyModifiedListView extends ItemView {
     }
 
     public readonly redraw = (): void => {
-        if (!this.plugin.data.isUpToDate) {
-            if (this.plugin.data.recentlyModifiedNotes?.length === 0 || this.plugin.settings.autoRefreshEnabled) {
-                console.log(`DV Recent redraw: no data ${this.plugin.data.recentlyModifiedNotes?.length} or not up to date -> REFRESHING from dv`)
+        console.log(`DV redraw invoked on view`)
+
+        const rootEl = createDiv({ cls: 'nav-folder mod-root' })
+        const childrenEl = rootEl.createDiv({ cls: 'nav-folder-children' })
+
+        if (!this.plugin.isDvAvailable()) {
+            // Dataview is not available, render a stubbed out row with status information
+            const navFile = childrenEl.createDiv({ cls: 'nav-file' })
+            const navFileTitle = navFile.createDiv({ cls: 'nav-file-title' })
+            navFileTitle.createDiv({
+                cls: 'nav-file-title-content',
+                text: 'Dataview plugin not available or not enabled.'
+            })
+            const contentEl = this.containerEl.children[1];
+            contentEl.empty();
+            contentEl.appendChild(rootEl);
+            return
+        }
+
+        // At this point we know Dataview is available, can interact
+        if (!this.plugin.getRecentlyModifiedNotesData().isUpToDate) {
+            if (this.plugin.getRecentlyModifiedNotesData().recentlyModifiedNotes?.length === 0 || this.plugin.isAutoDataRefreshEnabled()) {
+                console.log(`DV Recent redraw: no data ${this.plugin.getRecentlyModifiedNotesData().recentlyModifiedNotes?.length} or not up to date -> REFRESHING from dv`)
                 this.plugin.refreshRecentlyModifiedListFromDv()
             } else {
                 console.log(`DV Recent redraw: data not up to date (or empty), NOT refreshing`)
@@ -65,9 +85,6 @@ export class RecentlyModifiedListView extends ItemView {
         }
 
         const openFile = this.app.workspace.getActiveFile();
-
-        const rootEl = createDiv({ cls: 'nav-folder mod-root' });
-        const childrenEl = rootEl.createDiv({ cls: 'nav-folder-children' });
 
         this.data.recentlyModifiedNotes?.forEach((currentFile) => {
             const navFile = childrenEl.createDiv({ cls: 'nav-file' });
