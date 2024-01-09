@@ -39,5 +39,5 @@ esbuild.build({
 	sourcemap: prod ? false : 'inline',
 	minify: prod,
 	treeShaking: true,
-	outfile: 'dist/main.js',
+	outfile: 'main.js',
 }).catch(() => process.exit(1));
