@@ -36,7 +36,7 @@ export class RecentlyModifiedListView extends ItemView {
         return ICON_CLOCK_AND_PEN
     }
 
-    public onHeaderMenu(menu: Menu): void {
+    public onPaneMenu(menu: Menu): void {
         menu
             .addItem((item) => {
                 item
